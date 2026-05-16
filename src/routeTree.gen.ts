@@ -13,6 +13,7 @@ import { Route as ProgrammesRouteImport } from './routes/programmes'
 import { Route as ProfilesRouteImport } from './routes/profiles'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiMatchRouteImport } from './routes/api/match'
 
 const ProgrammesRoute = ProgrammesRouteImport.update({
   id: '/programmes',
@@ -34,18 +35,25 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMatchRoute = ApiMatchRouteImport.update({
+  id: '/api/match',
+  path: '/api/match',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/profiles': typeof ProfilesRoute
   '/programmes': typeof ProgrammesRoute
+  '/api/match': typeof ApiMatchRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/profiles': typeof ProfilesRoute
   '/programmes': typeof ProgrammesRoute
+  '/api/match': typeof ApiMatchRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,20 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/profiles': typeof ProfilesRoute
   '/programmes': typeof ProgrammesRoute
+  '/api/match': typeof ApiMatchRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/analytics' | '/profiles' | '/programmes'
+  fullPaths: '/' | '/analytics' | '/profiles' | '/programmes' | '/api/match'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/analytics' | '/profiles' | '/programmes'
-  id: '__root__' | '/' | '/analytics' | '/profiles' | '/programmes'
+  to: '/' | '/analytics' | '/profiles' | '/programmes' | '/api/match'
+  id:
+    | '__root__'
+    | '/'
+    | '/analytics'
+    | '/profiles'
+    | '/programmes'
+    | '/api/match'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +82,7 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   ProfilesRoute: typeof ProfilesRoute
   ProgrammesRoute: typeof ProgrammesRoute
+  ApiMatchRoute: typeof ApiMatchRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +115,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/match': {
+      id: '/api/match'
+      path: '/api/match'
+      fullPath: '/api/match'
+      preLoaderRoute: typeof ApiMatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,7 +130,18 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   ProfilesRoute: ProfilesRoute,
   ProgrammesRoute: ProgrammesRoute,
+  ApiMatchRoute: ApiMatchRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
