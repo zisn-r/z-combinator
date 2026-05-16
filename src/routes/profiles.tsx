@@ -18,7 +18,7 @@ export const Route = createFileRoute("/profiles")({
 
 function ProfilesPage() {
   const store = useProgrammeScoped();
-  const { pProfiles, pActorTypes, programme, addProfile, addLinkages, pLinkages, pTemplates } = store;
+  const { pProfiles, pActorTypes, programme, addLinkages, pTemplates } = store;
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<Set<string>>(new Set());
