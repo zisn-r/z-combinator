@@ -107,7 +107,7 @@ function ProfilesPage() {
             outcomeScore: null,
           } satisfies Linkage;
         })
-        .filter((l): l is Linkage => l !== null);
+        .filter((l) => l !== null) as Linkage[];
 
       addLinkages(newLinkages);
       toast.success(`${newLinkages.length} new AI-proposed match${newLinkages.length === 1 ? "" : "es"}.`);
