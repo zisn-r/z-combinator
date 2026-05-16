@@ -39,58 +39,83 @@ function ProfilesPage() {
       toast.error("Add a participant first, then run matching.");
       return;
     }
-    setMatching(true);
-    await new Promise((r) => setTimeout(r, 3000));
-
     const newProfile = pProfiles.find((p) => p.id === lastAddedId);
-    if (!newProfile) {
-      setMatching(false);
-      return;
-    }
-    const newType = pActorTypes.find((t) => t.id === newProfile.actorTypeId);
-    if (!newType) {
-      setMatching(false);
-      return;
-    }
-    // find opposite role
+    const newType = newProfile && pActorTypes.find((t) => t.id === newProfile.actorTypeId);
+    if (!newProfile || !newType) return;
+
     const oppositeRole = newType.roleCategory === "supply" ? "demand" : "supply";
     const oppositeTypes = pActorTypes.filter((t) => t.roleCategory === oppositeRole);
     const candidates = pProfiles.filter((p) => oppositeTypes.some((t) => t.id === p.actorTypeId));
+    if (candidates.length === 0) {
+      toast.error(`No ${oppositeRole}-side candidates available.`);
+      return;
+    }
 
-    const scored = candidates
-      .map((c) => {
-        const overlap = c.domainTags.filter((d) => newProfile.domainTags.includes(d)).length;
-        return {
-          profile: c,
-          score: Math.min(95, 55 + overlap * 14 + Math.floor(Math.random() * 6)),
-          overlap,
-        };
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 2);
+    setMatching(true);
+    try {
+      const typeName = (id: string) => pActorTypes.find((t) => t.id === id)?.name ?? "Unknown";
+      const res = await fetch("/api/match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          programme: { name: programme.name, theme: programme.theme },
+          source: {
+            name: newProfile.name,
+            actorType: newType.name,
+            roleCategory: newType.roleCategory,
+            domainTags: newProfile.domainTags,
+            bio: newProfile.bio,
+          },
+          candidates: candidates.map((c) => ({
+            id: c.id,
+            name: c.name,
+            actorType: typeName(c.actorTypeId),
+            domainTags: c.domainTags,
+            bio: c.bio,
+          })),
+        }),
+      });
 
-    const template = pTemplates[0];
-    const newLinkages: Linkage[] = scored.map((s) => {
-      const isSupplyNew = newType.roleCategory === "supply";
-      return {
-        id: uid("lk"),
-        programmeId: programme.id,
-        templateId: template?.id ?? "",
-        actorA: isSupplyNew ? newProfile.id : s.profile.id,
-        actorB: isSupplyNew ? s.profile.id : newProfile.id,
-        matchScore: s.score,
-        matchRationale:
-          s.overlap > 0
-            ? `Shared domains: ${newProfile.domainTags.filter((d) => s.profile.domainTags.includes(d)).join(", ")}. Embedding similarity is high relative to programme baseline.`
-            : "Profile embedding similarity within programme range. Cold start — limited domain overlap.",
-        status: "proposed",
-        outcomeScore: null,
+      if (!res.ok) {
+        if (res.status === 429) toast.error("AI rate limit reached. Try again shortly.");
+        else if (res.status === 402) toast.error("AI credits exhausted. Add credits in Workspace settings.");
+        else toast.error("AI matching failed.");
+        setMatching(false);
+        return;
+      }
+
+      const data = (await res.json()) as {
+        matches: { candidateId: string; score: number; rationale: string }[];
       };
-    });
+      const top = [...data.matches].sort((a, b) => b.score - a.score).slice(0, 2);
 
-    addLinkages(newLinkages);
-    setMatching(false);
-    toast.success(`${newLinkages.length} new match${newLinkages.length === 1 ? "" : "es"} proposed.`);
+      const template = pTemplates[0];
+      const isSupplyNew = newType.roleCategory === "supply";
+      const newLinkages: Linkage[] = top
+        .map((m) => {
+          const cand = candidates.find((c) => c.id === m.candidateId);
+          if (!cand) return null;
+          return {
+            id: uid("lk"),
+            programmeId: programme.id,
+            templateId: template?.id ?? "",
+            actorA: isSupplyNew ? newProfile.id : cand.id,
+            actorB: isSupplyNew ? cand.id : newProfile.id,
+            matchScore: Math.round(m.score),
+            matchRationale: m.rationale,
+            status: "proposed" as const,
+            outcomeScore: null,
+          } satisfies Linkage;
+        })
+        .filter((l) => l !== null) as Linkage[];
+
+      addLinkages(newLinkages);
+      toast.success(`${newLinkages.length} new AI-proposed match${newLinkages.length === 1 ? "" : "es"}.`);
+    } catch {
+      toast.error("AI matching failed.");
+    } finally {
+      setMatching(false);
+    }
   };
 
   const toggleType = (id: string) => {
